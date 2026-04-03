@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Game Zone!</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Game Zone">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#0a0a1a">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a1a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 52px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #FF0055, #FFD700, #00FF88, #00BBFF, #AA44FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none;
+            animation: glow 3s ease-in-out infinite;
+        }
+        @keyframes glow {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
+        }
+        .subtitle { color: #888; font-size: 18px; margin-bottom: 40px; }
+        .games {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 24px;
+            max-width: 900px;
+            width: 100%;
+        }
+        .game-card {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border-radius: 16px;
+            padding: 30px 24px;
+            text-align: center;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .game-card:hover {
+            transform: translateY(-6px) scale(1.02);
+        }
+        .game-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            border-radius: 16px 16px 0 0;
+        }
+        .game-card:nth-child(1) { border: 2px solid #FFD70044; }
+        .game-card:nth-child(1):hover { box-shadow: 0 8px 30px #FFD70033; }
+        .game-card:nth-child(1)::before { background: #FFD700; }
+
+        .game-card:nth-child(2) { border: 2px solid #00FFAA44; }
+        .game-card:nth-child(2):hover { box-shadow: 0 8px 30px #00FFAA33; }
+        .game-card:nth-child(2)::before { background: #00FFAA; }
+
+        .game-card:nth-child(3) { border: 2px solid #e9456044; }
+        .game-card:nth-child(3):hover { box-shadow: 0 8px 30px #e9456033; }
+        .game-card:nth-child(3)::before { background: #e94560; }
+
+        .game-card:nth-child(4) { border: 2px solid #FF6B3544; }
+        .game-card:nth-child(4):hover { box-shadow: 0 8px 30px #FF6B3533; }
+        .game-card:nth-child(4)::before { background: #FF6B35; }
+
+        .game-card:nth-child(5) { border: 2px solid #00FF4144; }
+        .game-card:nth-child(5):hover { box-shadow: 0 8px 30px #00FF4133; }
+        .game-card:nth-child(5)::before { background: #00FF41; }
+
+        .game-card:nth-child(6) { border: 2px solid #FF69B444; }
+        .game-card:nth-child(6):hover { box-shadow: 0 8px 30px #FF69B433; }
+        .game-card:nth-child(6)::before { background: #FF69B4; }
+
+        .game-card:nth-child(7) { border: 2px solid #2a7d3f44; }
+        .game-card:nth-child(7):hover { box-shadow: 0 8px 30px #2a7d3f33; }
+        .game-card:nth-child(7)::before { background: #2a7d3f; }
+
+        .game-card:nth-child(8) { border: 2px solid #0f044; }
+        .game-card:nth-child(8):hover { box-shadow: 0 8px 30px #00ff0033; }
+        .game-card:nth-child(8)::before { background: #0f0; }
+
+        .game-card:nth-child(9) { border: 2px solid #B10DC944; }
+        .game-card:nth-child(9):hover { box-shadow: 0 8px 30px #B10DC933; }
+        .game-card:nth-child(9)::before { background: linear-gradient(90deg, #FF4D6D, #FFD93D, #6BCB77, #4D96FF); }
+
+        .game-card:nth-child(10) { border: 2px solid #FF450044; }
+        .game-card:nth-child(10):hover { box-shadow: 0 8px 30px #FF450033; }
+        .game-card:nth-child(10)::before { background: #FF4500; }
+
+        .game-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+        .game-title { color: #FFF; font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+        .game-desc { color: #999; font-size: 14px; line-height: 1.5; }
+        .game-controls { color: #666; font-size: 12px; margin-top: 12px; }
+
+        footer { color: #444; margin-top: 40px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <h1>GAME ZONE</h1>
+    <div class="subtitle">Choose a game to play!</div>
+    <div class="games">
+        <a class="game-card" href="pacman.html">
+            <span class="game-icon">👾</span>
+            <div class="game-title">PAC-MAN</div>
+            <div class="game-desc">Eat all the dots and avoid the ghosts! Grab power pellets to eat them back!</div>
+            <div class="game-controls">Arrow keys to move</div>
+        </a>
+        <a class="game-card" href="xonix.html">
+            <span class="game-icon">🟩</span>
+            <div class="game-title">XONIX</div>
+            <div class="game-desc">Close off 75% of the field while dodging the bouncing enemies!</div>
+            <div class="game-controls">Arrow keys to move</div>
+        </a>
+        <a class="game-card" href="snake.html">
+            <span class="game-icon">🐍</span>
+            <div class="game-title">SNAKE</div>
+            <div class="game-desc">Eat fruit and grow longer. Don't crash into yourself!</div>
+            <div class="game-controls">Arrow keys / Swipe</div>
+        </a>
+        <a class="game-card" href="breakout.html">
+            <span class="game-icon">🧱</span>
+            <div class="game-title">BREAKOUT</div>
+            <div class="game-desc">Break all the bricks with the ball! Catch power-ups for extra abilities!</div>
+            <div class="game-controls">Mouse / Touch to move paddle</div>
+        </a>
+        <a class="game-card" href="invaders.html">
+            <span class="game-icon">🚀</span>
+            <div class="game-title">SPACE INVADERS</div>
+            <div class="game-desc">Defend Earth from waves of alien invaders! Hide behind shields!</div>
+            <div class="game-controls">Arrows + SPACE to shoot</div>
+        </a>
+        <a class="game-card" href="pong.html">
+            <span class="game-icon">🏓</span>
+            <div class="game-title">PONG</div>
+            <div class="game-desc">Classic Pong! Play against the computer or a friend. First to 7 wins!</div>
+            <div class="game-controls">W/S or Arrows | 2P mode available</div>
+        </a>
+        <a class="game-card" href="candy.html">
+            <span class="game-icon">🍬</span>
+            <div class="game-title">CANDY CRUSH</div>
+            <div class="game-desc">Match 3+ candies of the same type! Chain combos for massive points!</div>
+            <div class="game-controls">Click / Swipe to swap candies</div>
+        </a>
+        <a class="game-card" href="fruitninja.html">
+            <span class="game-icon">🍉</span>
+            <div class="game-title">FRUIT NINJA</div>
+            <div class="game-desc">Slice flying fruits with your blade! Avoid the bombs!</div>
+            <div class="game-controls">Click & drag to slice</div>
+        </a>
+        <a class="game-card" href="bubbles.html">
+            <span class="game-icon">🫧</span>
+            <div class="game-title">BUBBLE SHOOTER</div>
+            <div class="game-desc">Aim and shoot bubbles to match 3+ of the same color and pop them!</div>
+            <div class="game-controls">Mouse / Touch to aim & shoot</div>
+        </a>
+        <a class="game-card" href="solitaire.html">
+            <span class="game-icon">🃏</span>
+            <div class="game-title">SOLITAIRE</div>
+            <div class="game-desc">Classic Klondike solitaire! Drag cards to build foundations from Ace to King.</div>
+            <div class="game-controls">Mouse / Touch to drag cards</div>
+        </a>
+    </div>
+    <footer>Built with love for gaming!</footer>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>

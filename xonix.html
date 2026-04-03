@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xonix - סוגר שטחים!</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+        #header { color: #00FFAA; font-size: 28px; margin-bottom: 10px; text-shadow: 0 0 10px #00FFAA; }
+        #score-board { color: #FFF; font-size: 18px; margin-bottom: 10px; display: flex; gap: 30px; direction: ltr; }
+        #score-board span { color: #00FFAA; }
+        canvas { border: 3px solid #00FFAA; border-radius: 8px; box-shadow: 0 0 20px #00FFAA44; background: #000; }
+        #message { color: #00FFAA; font-size: 28px; margin-top: 12px; min-height: 36px; text-shadow: 0 0 10px #00FFAA; }
+        #controls-hint { color: #888; font-size: 14px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div id="header">XONIX</div>
+    <div id="score-board">
+        <div>Filled: <span id="filled">0%</span></div>
+        <div>Lives: <span id="lives">3</span></div>
+        <div>Level: <span id="level">1</span></div>
+        <div>Score: <span id="score">0</span></div>
+    </div>
+    <canvas id="game"></canvas>
+    <div id="message"></div>
+    <div id="controls-hint">Arrow keys to move / Fill 75% to win!</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const CELL = 8;
+const COLS = 80;
+const ROWS = 60;
+canvas.width = COLS * CELL;
+canvas.height = ROWS * CELL;
+
+const EMPTY = 0, BORDER = 1, FILLED = 2, TRAIL = 3;
+
+let grid, player, enemies, lives, level, score, gameState, animFrame;
+let filledPercent = 0;
+const TARGET_PERCENT = 75;
+
+function init() {
+    lives = 3;
+    level = 1;
+    score = 0;
+    gameState = 'playing';
+    document.getElementById('message').textContent = '';
+    setupLevel();
+}
+
+function setupLevel() {
+    grid = Array.from({ length: ROWS }, () => Array(COLS).fill(EMPTY));
+    // Create border
+    for (let c = 0; c < COLS; c++) { grid[0][c] = BORDER; grid[ROWS - 1][c] = BORDER; }
+    for (let r = 0; r < ROWS; r++) { grid[r][0] = BORDER; grid[r][COLS - 1] = BORDER; }
+    // Second row border
+    for (let c = 0; c < COLS; c++) { grid[1][c] = BORDER; grid[ROWS - 2][c] = BORDER; }
+    for (let r = 0; r < ROWS; r++) { grid[r][1] = BORDER; grid[r][COLS - 2] = BORDER; }
+
+    player = { x: Math.floor(COLS / 2), y: 0, dx: 0, dy: 0, onBorder: true, alive: true };
+
+    const numEnemies = level + 1;
+    enemies = [];
+    for (let i = 0; i < numEnemies; i++) {
+        enemies.push({
+            x: 10 + Math.floor(Math.random() * (COLS - 20)),
+            y: 10 + Math.floor(Math.random() * (ROWS - 20)),
+            dx: (Math.random() > 0.5 ? 1 : -1),
+            dy: (Math.random() > 0.5 ? 1 : -1),
+            color: `hsl(${Math.random() * 360}, 100%, 60%)`
+        });
+    }
+    calcFilled();
+    updateUI();
+}
+
+function calcFilled() {
+    let total = 0, filled = 0;
+    for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+            total++;
+            if (grid[r][c] === BORDER || grid[r][c] === FILLED) filled++;
+        }
+    filledPercent = Math.round((filled / total) * 100);
+}
+
+function updateUI() {
+    document.getElementById('filled').textContent = filledPercent + '%';
+    document.getElementById('lives').textContent = lives;
+    document.getElementById('level').textContent = level;
+    document.getElementById('score').textContent = score;
+}
+
+function floodFill(startR, startC, target, replacement) {
+    if (startR < 0 || startR >= ROWS || startC < 0 || startC >= COLS) return 0;
+    if (grid[startR][startC] !== target) return 0;
+    const stack = [[startR, startC]];
+    let count = 0;
+    const visited = new Set();
+    while (stack.length > 0) {
+        const [r, c] = stack.pop();
+        const key = r * COLS + c;
+        if (visited.has(key)) continue;
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+        if (grid[r][c] !== target) continue;
+        visited.add(key);
+        grid[r][c] = replacement;
+        count++;
+        stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+    }
+    return count;
+}
+
+function fillEnclosed() {
+    // Convert trail to border
+    for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+            if (grid[r][c] === TRAIL) grid[r][c] = BORDER;
+
+    // Mark which EMPTY cells contain enemies
+    const enemyCells = new Set();
+    for (const e of enemies) {
+        // Flood fill from enemy position to find connected empty region
+        const tempGrid = grid.map(row => [...row]);
+        const stack = [[Math.round(e.y), Math.round(e.x)]];
+        const visited = new Set();
+        while (stack.length > 0) {
+            const [r, c] = stack.pop();
+            const key = r * COLS + c;
+            if (visited.has(key)) continue;
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+            if (grid[r][c] !== EMPTY) continue;
+            visited.add(key);
+            enemyCells.add(key);
+            stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+        }
+    }
+
+    // Fill all empty cells NOT connected to enemies
+    let filledCount = 0;
+    for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+            if (grid[r][c] === EMPTY && !enemyCells.has(r * COLS + c)) {
+                grid[r][c] = FILLED;
+                filledCount++;
+            }
+        }
+    score += filledCount * 10;
+    calcFilled();
+}
+
+function killPlayer() {
+    // Remove trail
+    for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+            if (grid[r][c] === TRAIL) grid[r][c] = EMPTY;
+
+    lives--;
+    if (lives <= 0) {
+        gameState = 'gameover';
+    } else {
+        player.x = Math.floor(COLS / 2);
+        player.y = 0;
+        player.dx = 0;
+        player.dy = 0;
+        player.onBorder = true;
+    }
+    updateUI();
+}
+
+function movePlayer() {
+    if (player.dx === 0 && player.dy === 0) return;
+
+    const nx = player.x + player.dx;
+    const ny = player.y + player.dy;
+
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
+        player.dx = 0;
+        player.dy = 0;
+        return;
+    }
+
+    const nextTile = grid[ny][nx];
+
+    if (nextTile === TRAIL) {
+        killPlayer();
+        return;
+    }
+
+    if (player.onBorder) {
+        if (nextTile === EMPTY) {
+            // Leaving border
+            player.onBorder = false;
+            grid[ny][nx] = TRAIL;
+            player.x = nx;
+            player.y = ny;
+        } else if (nextTile === BORDER || nextTile === FILLED) {
+            player.x = nx;
+            player.y = ny;
+        }
+    } else {
+        if (nextTile === EMPTY) {
+            grid[ny][nx] = TRAIL;
+            player.x = nx;
+            player.y = ny;
+        } else if (nextTile === BORDER || nextTile === FILLED) {
+            // Returned to border!
+            player.x = nx;
+            player.y = ny;
+            player.onBorder = true;
+            player.dx = 0;
+            player.dy = 0;
+            fillEnclosed();
+            if (filledPercent >= TARGET_PERCENT) {
+                gameState = 'win';
+            }
+        }
+    }
+}
+
+function moveEnemies() {
+    for (const e of enemies) {
+        const nx = Math.round(e.x + e.dx);
+        const ny = Math.round(e.y + e.dy);
+
+        let bounced = false;
+        if (nx <= 2 || nx >= COLS - 3 || grid[Math.round(e.y)][nx] === BORDER || grid[Math.round(e.y)][nx] === FILLED) {
+            e.dx = -e.dx;
+            bounced = true;
+        }
+        if (ny <= 2 || ny >= ROWS - 3 || grid[ny][Math.round(e.x)] === BORDER || grid[ny][Math.round(e.x)] === FILLED) {
+            e.dy = -e.dy;
+            bounced = true;
+        }
+
+        e.x += e.dx;
+        e.y += e.dy;
+        e.x = Math.max(2, Math.min(COLS - 3, e.x));
+        e.y = Math.max(2, Math.min(ROWS - 3, e.y));
+
+        // Check if enemy hits trail
+        const er = Math.round(e.y);
+        const ec = Math.round(e.x);
+        if (grid[er] && grid[er][ec] === TRAIL) {
+            killPlayer();
+            return;
+        }
+    }
+
+    // Check collision with player when not on border
+    if (!player.onBorder) {
+        for (const e of enemies) {
+            const dist = Math.abs(e.x - player.x) + Math.abs(e.y - player.y);
+            if (dist < 2) {
+                killPlayer();
+                return;
+            }
+        }
+    }
+}
+
+function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const tile = grid[r][c];
+            if (tile === BORDER) {
+                ctx.fillStyle = '#00FFAA';
+                ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+            } else if (tile === FILLED) {
+                ctx.fillStyle = '#005533';
+                ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+            } else if (tile === TRAIL) {
+                ctx.fillStyle = '#FFFF00';
+                ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+            }
+        }
+    }
+
+    // Player
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = '#FFFFFF';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(player.x * CELL + CELL / 2, player.y * CELL + CELL / 2, CELL / 2 + 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Enemies
+    for (const e of enemies) {
+        ctx.fillStyle = e.color;
+        ctx.shadowColor = e.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(e.x * CELL + CELL / 2, e.y * CELL + CELL / 2, CELL, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+let tickAccum = 0;
+const TICK = 1000 / 20;
+let lastTime = 0;
+
+function gameLoop(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = ts - lastTime;
+    lastTime = ts;
+    animFrame = (animFrame || 0) + 1;
+
+    if (gameState === 'playing') {
+        tickAccum += dt;
+        while (tickAccum >= TICK) {
+            tickAccum -= TICK;
+            movePlayer();
+            moveEnemies();
+            updateUI();
+        }
+    }
+
+    draw();
+
+    const msgEl = document.getElementById('message');
+    if (gameState === 'gameover') {
+        msgEl.textContent = 'GAME OVER - SPACE to restart';
+        msgEl.style.color = '#FF4444';
+    } else if (gameState === 'win') {
+        msgEl.textContent = `Level ${level} Complete! SPACE for next`;
+        msgEl.style.color = '#00FFAA';
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (gameState === 'playing') {
+        switch (e.key) {
+            case 'ArrowLeft': player.dx = -1; player.dy = 0; e.preventDefault(); break;
+            case 'ArrowRight': player.dx = 1; player.dy = 0; e.preventDefault(); break;
+            case 'ArrowUp': player.dx = 0; player.dy = -1; e.preventDefault(); break;
+            case 'ArrowDown': player.dx = 0; player.dy = 1; e.preventDefault(); break;
+        }
+    }
+    if (e.key === ' ') {
+        e.preventDefault();
+        if (gameState === 'gameover') init();
+        else if (gameState === 'win') { level++; setupLevel(); gameState = 'playing'; document.getElementById('message').textContent = ''; }
+    }
+});
+
+// Touch support
+let touchX = 0, touchY = 0;
+canvas.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
+canvas.addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - touchX;
+    const dy = e.touches[0].clientY - touchY;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        if (Math.abs(dx) > Math.abs(dy)) { player.dx = dx > 0 ? 1 : -1; player.dy = 0; }
+        else { player.dy = dy > 0 ? 1 : -1; player.dx = 0; }
+        touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
+    }
+    e.preventDefault();
+}, { passive: false });
+
+init();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

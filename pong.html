@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong!</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+        #header { color: #0f0; font-size: 28px; margin-bottom: 8px; text-shadow: 0 0 10px #0f0; letter-spacing: 6px; }
+        #mode-select { margin-bottom: 10px; display: flex; gap: 10px; }
+        #mode-select button {
+            background: #222; color: #0f0; border: 2px solid #0f0; padding: 8px 20px;
+            border-radius: 8px; cursor: pointer; font-family: 'Courier New'; font-size: 14px;
+        }
+        #mode-select button:hover, #mode-select button.active { background: #0f0; color: #111; }
+        canvas { border: 2px solid #0f0; box-shadow: 0 0 20px #0f044; }
+        #info { color: #888; font-size: 13px; margin-top: 10px; text-align: center; direction: ltr; }
+        #message { color: #0f0; font-size: 28px; margin-top: 10px; min-height: 36px; text-shadow: 0 0 10px #0f0; }
+    </style>
+</head>
+<body>
+    <div id="header">PONG</div>
+    <div id="mode-select">
+        <button id="btn1p" class="active">1 Player</button>
+        <button id="btn2p">2 Players</button>
+    </div>
+    <canvas id="game"></canvas>
+    <div id="info"></div>
+    <div id="message"></div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 640;
+canvas.height = 420;
+
+const PADDLE_W = 12, PADDLE_H = 80, BALL_R = 8;
+const WIN_SCORE = 7;
+
+let mode = '1p';
+let leftPaddle, rightPaddle, ball, particles, trail;
+let leftScore, rightScore, gameState, countdown;
+let animFrame = 0;
+const keys = {};
+
+function init() {
+    leftScore = 0; rightScore = 0;
+    gameState = 'countdown';
+    countdown = 3;
+    particles = [];
+    trail = [];
+    resetBall();
+    leftPaddle = { y: canvas.height / 2 - PADDLE_H / 2 };
+    rightPaddle = { y: canvas.height / 2 - PADDLE_H / 2 };
+    document.getElementById('message').textContent = '';
+    updateInfo();
+    startCountdown();
+}
+
+function updateInfo() {
+    if (mode === '1p') {
+        document.getElementById('info').textContent = 'W/S or Arrow keys to move | First to 7 wins!';
+    } else {
+        document.getElementById('info').textContent = 'Left: W/S | Right: Arrow Up/Down | First to 7 wins!';
+    }
+}
+
+function resetBall() {
+    ball = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        dx: 0, dy: 0,
+        speed: 5
+    };
+}
+
+function launchBall() {
+    const angle = (Math.random() - 0.5) * Math.PI / 3;
+    const dir = Math.random() > 0.5 ? 1 : -1;
+    ball.dx = Math.cos(angle) * ball.speed * dir;
+    ball.dy = Math.sin(angle) * ball.speed;
+}
+
+function startCountdown() {
+    countdown = 3;
+    gameState = 'countdown';
+    const timer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+            clearInterval(timer);
+            gameState = 'playing';
+            launchBall();
+        }
+    }, 700);
+}
+
+function spawnParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x, y,
+            dx: (Math.random() - 0.5) * 10,
+            dy: (Math.random() - 0.5) * 10,
+            life: 15 + Math.random() * 15,
+            color, size: 2 + Math.random() * 3
+        });
+    }
+}
+
+function aiMove() {
+    const targetY = ball.dx > 0 ? ball.y : canvas.height / 2;
+    const center = rightPaddle.y + PADDLE_H / 2;
+    const diff = targetY - center;
+    const aiSpeed = 3.5 + Math.min(leftScore + rightScore, 6) * 0.3;
+    if (Math.abs(diff) > 5) {
+        rightPaddle.y += Math.sign(diff) * Math.min(aiSpeed, Math.abs(diff));
+    }
+    rightPaddle.y = Math.max(0, Math.min(canvas.height - PADDLE_H, rightPaddle.y));
+}
+
+function update() {
+    animFrame++;
+
+    // Player 1 (left) controls
+    const p1Speed = 6;
+    if (keys['w'] || keys['W'] || (mode === '1p' && keys['ArrowUp'])) leftPaddle.y -= p1Speed;
+    if (keys['s'] || keys['S'] || (mode === '1p' && keys['ArrowDown'])) leftPaddle.y += p1Speed;
+    leftPaddle.y = Math.max(0, Math.min(canvas.height - PADDLE_H, leftPaddle.y));
+
+    // Player 2 / AI
+    if (mode === '2p') {
+        if (keys['ArrowUp']) rightPaddle.y -= p1Speed;
+        if (keys['ArrowDown']) rightPaddle.y += p1Speed;
+        rightPaddle.y = Math.max(0, Math.min(canvas.height - PADDLE_H, rightPaddle.y));
+    } else {
+        aiMove();
+    }
+
+    if (gameState !== 'playing') return;
+
+    // Trail
+    trail.push({ x: ball.x, y: ball.y, life: 10 });
+    if (trail.length > 20) trail.shift();
+
+    // Ball movement
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    // Top/bottom walls
+    if (ball.y - BALL_R <= 0) { ball.y = BALL_R; ball.dy = Math.abs(ball.dy); spawnParticles(ball.x, ball.y, '#0f0', 5); }
+    if (ball.y + BALL_R >= canvas.height) { ball.y = canvas.height - BALL_R; ball.dy = -Math.abs(ball.dy); spawnParticles(ball.x, ball.y, '#0f0', 5); }
+
+    // Left paddle collision
+    if (ball.dx < 0 &&
+        ball.x - BALL_R <= PADDLE_W + 10 &&
+        ball.x - BALL_R >= 8 &&
+        ball.y >= leftPaddle.y - 4 &&
+        ball.y <= leftPaddle.y + PADDLE_H + 4) {
+        const hitPos = (ball.y - leftPaddle.y) / PADDLE_H - 0.5;
+        ball.dx = Math.abs(ball.dx) * 1.05;
+        ball.dy = hitPos * 8;
+        ball.x = PADDLE_W + 10 + BALL_R;
+        const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+        if (speed > 12) { ball.dx *= 12 / speed; ball.dy *= 12 / speed; }
+        spawnParticles(ball.x, ball.y, '#0ff', 8);
+    }
+
+    // Right paddle collision
+    if (ball.dx > 0 &&
+        ball.x + BALL_R >= canvas.width - PADDLE_W - 10 &&
+        ball.x + BALL_R <= canvas.width - 8 &&
+        ball.y >= rightPaddle.y - 4 &&
+        ball.y <= rightPaddle.y + PADDLE_H + 4) {
+        const hitPos = (ball.y - rightPaddle.y) / PADDLE_H - 0.5;
+        ball.dx = -Math.abs(ball.dx) * 1.05;
+        ball.dy = hitPos * 8;
+        ball.x = canvas.width - PADDLE_W - 10 - BALL_R;
+        const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+        if (speed > 12) { ball.dx *= 12 / speed; ball.dy *= 12 / speed; }
+        spawnParticles(ball.x, ball.y, '#f0f', 8);
+    }
+
+    // Scoring
+    if (ball.x < -20) {
+        rightScore++;
+        spawnParticles(0, ball.y, '#f00', 20);
+        checkWin();
+        if (gameState === 'playing') { resetBall(); startCountdown(); }
+    }
+    if (ball.x > canvas.width + 20) {
+        leftScore++;
+        spawnParticles(canvas.width, ball.y, '#f00', 20);
+        checkWin();
+        if (gameState === 'playing') { resetBall(); startCountdown(); }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.dx; p.y += p.dy;
+        p.dx *= 0.95; p.dy *= 0.95;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Trail decay
+    for (let i = trail.length - 1; i >= 0; i--) {
+        trail[i].life--;
+        if (trail[i].life <= 0) trail.splice(i, 1);
+    }
+}
+
+function checkWin() {
+    if (leftScore >= WIN_SCORE) {
+        gameState = 'won';
+        document.getElementById('message').textContent = mode === '1p' ? 'YOU WIN!' : 'LEFT PLAYER WINS!';
+        document.getElementById('message').style.color = '#0f0';
+    } else if (rightScore >= WIN_SCORE) {
+        gameState = 'won';
+        document.getElementById('message').textContent = mode === '1p' ? 'COMPUTER WINS!' : 'RIGHT PLAYER WINS!';
+        document.getElementById('message').style.color = '#f44';
+    }
+}
+
+function draw() {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Center line
+    ctx.strokeStyle = 'rgba(0,255,0,0.15)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 12]);
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, 0);
+    ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Scores
+    ctx.fillStyle = 'rgba(0,255,0,0.25)';
+    ctx.font = 'bold 80px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(leftScore, canvas.width / 4, 80);
+    ctx.fillText(rightScore, canvas.width * 3 / 4, 80);
+
+    // Paddles with glow
+    ctx.shadowColor = '#0ff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#0ff';
+    ctx.fillRect(10, leftPaddle.y, PADDLE_W, PADDLE_H);
+    ctx.shadowColor = '#f0f';
+    ctx.fillStyle = '#f0f';
+    ctx.fillRect(canvas.width - 10 - PADDLE_W, rightPaddle.y, PADDLE_W, PADDLE_H);
+    ctx.shadowBlur = 0;
+
+    // Ball trail
+    for (const t of trail) {
+        ctx.globalAlpha = t.life / 10 * 0.3;
+        ctx.fillStyle = '#0f0';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, BALL_R * (t.life / 10), 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Ball
+    ctx.fillStyle = '#FFF';
+    ctx.shadowColor = '#0f0';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Particles
+    for (const p of particles) {
+        ctx.globalAlpha = p.life / 30;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Countdown
+    if (gameState === 'countdown' && countdown > 0) {
+        ctx.fillStyle = '#0f0';
+        ctx.font = 'bold 72px Courier New';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#0f0';
+        ctx.shadowBlur = 20;
+        ctx.fillText(countdown, canvas.width / 2, canvas.height / 2 + 20);
+        ctx.shadowBlur = 0;
+    }
+
+    if (gameState === 'won') {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0f0';
+        ctx.font = '20px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('Press SPACE to play again', canvas.width / 2, canvas.height / 2 + 40);
+    }
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (['ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
+    if (e.key === ' ' && gameState === 'won') init();
+});
+document.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+// Touch support - move left paddle with touch
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const sy = canvas.height / rect.height;
+    const ty = (e.touches[0].clientY - rect.top) * sy;
+    leftPaddle.y = ty - PADDLE_H / 2;
+    leftPaddle.y = Math.max(0, Math.min(canvas.height - PADDLE_H, leftPaddle.y));
+}, { passive: false });
+
+canvas.addEventListener('touchstart', (e) => {
+    if (gameState === 'won') init();
+}, { passive: true });
+
+// Mode buttons
+document.getElementById('btn1p').addEventListener('click', () => {
+    mode = '1p';
+    document.getElementById('btn1p').classList.add('active');
+    document.getElementById('btn2p').classList.remove('active');
+    init();
+});
+document.getElementById('btn2p').addEventListener('click', () => {
+    mode = '2p';
+    document.getElementById('btn2p').classList.add('active');
+    document.getElementById('btn1p').classList.remove('active');
+    init();
+});
+
+init();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
