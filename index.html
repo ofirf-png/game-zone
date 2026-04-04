@@ -38,15 +38,15 @@
         .subtitle { color: #888; font-size: 18px; margin-bottom: 40px; }
         .games {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
             max-width: 900px;
             width: 100%;
         }
         .game-card {
             background: linear-gradient(135deg, #1a1a2e, #16213e);
             border-radius: 16px;
-            padding: 30px 24px;
+            padding: 16px 12px;
             text-align: center;
             text-decoration: none;
             transition: transform 0.2s, box-shadow 0.2s;
@@ -104,12 +104,28 @@
         .game-card:nth-child(10):hover { box-shadow: 0 8px 30px #FF450033; }
         .game-card:nth-child(10)::before { background: #FF4500; }
 
-        .game-icon { font-size: 48px; margin-bottom: 12px; display: block; }
-        .game-title { color: #FFF; font-size: 22px; font-weight: bold; margin-bottom: 8px; }
-        .game-desc { color: #999; font-size: 14px; line-height: 1.5; }
-        .game-controls { color: #666; font-size: 12px; margin-top: 12px; }
+        .game-icon { font-size: 36px; margin-bottom: 8px; display: block; }
+        .game-title { color: #FFF; font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+        .game-desc { color: #999; font-size: 11px; line-height: 1.4; }
+        .game-controls { color: #666; font-size: 10px; margin-top: 8px; }
 
-        footer { color: #444; margin-top: 40px; font-size: 13px; }
+        footer { color: #444; margin-top: 30px; font-size: 13px; }
+
+        @media (min-width: 600px) {
+            .games { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+            .game-card { padding: 28px 22px; }
+            .game-icon { font-size: 48px; margin-bottom: 12px; }
+            .game-title { font-size: 22px; margin-bottom: 8px; }
+            .game-desc { font-size: 14px; }
+            .game-controls { font-size: 12px; }
+        }
+        @media (max-width: 400px) {
+            h1 { font-size: 32px; }
+            .subtitle { font-size: 14px; margin-bottom: 20px; }
+            body { padding: 10px; }
+            .games { gap: 8px; }
+            .game-desc { display: none; }
+        }
     </style>
 </head>
 <body>
